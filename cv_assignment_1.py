@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import time
 
 # Open the default camera (0)
 cap = cv2.VideoCapture(0)
@@ -11,6 +12,14 @@ else:
         # Dummy function for the trackbar
         def nothing(x):
                 pass
+        # Function for adding labels
+        def add_label(img, text):
+                if len(img.shape) == 2:
+                        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+                cv2.rectangle(img, (0, 0), (220, 35), (0, 0, 0), -1)
+                cv2.putText(img, text, (10, 24),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                return img      
 
         # Window
         cv2.namedWindow("My Dashboard")
@@ -23,6 +32,12 @@ else:
         cv2.createTrackbar("Canny Size", "My Dashboard", 0, 2, nothing)
         cv2.createTrackbar("Canny Lower Threshold", "My Dashboard", 50, 255, nothing)
         cv2.createTrackbar("Canny Upper Threshold", "My Dashboard", 100, 255, nothing)
+
+        # Manual Sobel selector (0 -> 3x3, 1 -> 5x5)
+        cv2.createTrackbar("Manual Sobel", "My Dashboard", 0, 1, nothing)
+
+        # FPS timer
+        prev_time = time.time()
 
         while True:
                 ret, frame = cap.read()  # Capture each frame
@@ -136,22 +151,83 @@ else:
                 laplacian = cv2.Laplacian(gray, cv2.CV_64F)
                 laplacian_abs = cv2.convertScaleAbs(laplacian)
 
+                # Manual Sobel
+                man_choice = cv2.getTrackbarPos("Manual Sobel", "My Dashboard")
+                man_sobel_k = 3 if man_choice == 0 else 5
+
+                if man_sobel_k == 3:
+                        Kx = np.array([[-1, 0, 1],
+                                       [-2, 0, 2],
+                                       [-1, 0, 1]], dtype=np.float32)
+                        Ky = np.array([[-1, -2, -1],
+                                       [ 0,  0,  0],
+                                       [ 1,  2,  1]], dtype=np.float32)
+                else:
+                        Kx = np.array([[-1, -2, 0, 2, 1],
+                                       [-4, -8, 0, 8, 4],
+                                       [-6, -12, 0, 12, 6],
+                                       [-4, -8, 0, 8, 4],
+                                       [-1, -2, 0, 2, 1]], dtype=np.float32)
+                        Ky = Kx.T
+
+                man_gx = cv2.filter2D(gray, cv2.CV_64F, Kx)
+                man_gy = cv2.filter2D(gray, cv2.CV_64F, Ky)
+                man_out = cv2.convertScaleAbs(cv2.magnitude(man_gx, man_gy))
+
                 # Convert the 1-channel grayscale image and histogram to a 3-channel BGR image in order to use hconcat
                 gray_rgb = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
                 gray_hist_rgb = cv2.cvtColor(gray_hist_img, cv2.COLOR_GRAY2BGR)
                 sobel_bgr = cv2.cvtColor(sobel_combined, cv2.COLOR_GRAY2BGR)
                 canny_bgr = cv2.cvtColor(canny_edges, cv2.COLOR_GRAY2BGR)
                 log_bgr = cv2.cvtColor(laplacian_abs, cv2.COLOR_GRAY2BGR)
+                man_bgr = cv2.cvtColor(man_out, cv2.COLOR_GRAY2BGR)  
                 
                 # Now concatenate them since they all have 3 channels!
                 # Create a blank image to fill empty grid slots
                 blank = np.zeros((hist_h, hist_w, 3), dtype=np.uint8)
-                row1 = cv2.hconcat([frame, gray_rgb, hsv])
-                row2 = cv2.hconcat([original_hist_img, gray_hist_rgb, hsv_hist_img])
-                row3 = cv2.hconcat([sobel_bgr, canny_bgr, log_bgr])
-                mosaic = cv2.vconcat([row1, row2, row3])
-                cv2.imshow("Mosaic", mosaic)
-                
+                #row1 = cv2.hconcat([frame, gray_rgb, hsv])
+                #row2 = cv2.hconcat([original_hist_img, gray_hist_rgb, hsv_hist_img])
+                #row3 = cv2.hconcat([sobel_bgr, canny_bgr, log_bgr])
+                #mosaic = cv2.vconcat([row1, row2, row3])
+
+                # Label each panel and concatenate
+                row1 = cv2.hconcat([
+                        add_label(frame.copy(), "Original (BGR)"),
+                        add_label(gray_rgb.copy(), "Grayscale"),
+                        add_label(hsv.copy(), "HSV")
+                ])
+                row2 = cv2.hconcat([
+                        add_label(original_hist_img.copy(), "Hist BGR"),
+                        add_label(gray_hist_rgb.copy(), "Hist Gray"),
+                        add_label(hsv_hist_img.copy(), "Hist HSV")
+                ])
+                row3 = cv2.hconcat([
+                        add_label(sobel_bgr.copy(), f"Sobel (k={sobel_k})"),
+                        add_label(canny_bgr.copy(), f"Canny (k={canny_k})"),
+                        add_label(log_bgr.copy(), "LoG")
+                ])
+                row4 = cv2.hconcat([
+                        add_label(man_bgr.copy(), f"Manual Sobel ({man_sobel_k}x{man_sobel_k})"),
+                        blank,
+                        blank
+                ])
+
+                mosaic = cv2.vconcat([row1, row2, row3, row4])
+
+                # FPS Counter
+                curr_time = time.time()
+                dt = curr_time - prev_time
+                fps = 1 / dt if dt > 0 else 0
+                prev_time = curr_time
+
+                cv2.rectangle(mosaic, (mosaic.shape[1] - 150, 0), (mosaic.shape[1], 40), (0, 0, 0), -1)
+                cv2.putText(mosaic, f"FPS: {int(fps)}",
+                            (mosaic.shape[1] - 140, 25),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
+
+                # Display
+                cv2.imshow("My Dashboard", mosaic)
+
                 # Break on 'ESC' key
                 if cv2.waitKey(1) & 0xFF == 27:
                         break
