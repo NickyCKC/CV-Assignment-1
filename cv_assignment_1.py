@@ -144,7 +144,7 @@ else:
                 canny_k = (canny_val * 2) + 3
                 canny_edges = cv2.Canny(gray, canny_lower, canny_upper, apertureSize=canny_k)
 
-                # Laplacian of Gaussian (LoG)
+                # Laplacian of Gaussian (LoG), gaussian blurred from earlier
                 laplacian = cv2.Laplacian(gray, cv2.CV_64F)
                 laplacian_abs = cv2.convertScaleAbs(laplacian)
 
@@ -171,7 +171,7 @@ else:
                 log_bgr = cv2.cvtColor(laplacian_abs, cv2.COLOR_GRAY2BGR)
                 man_bgr = cv2.cvtColor(man_out, cv2.COLOR_GRAY2BGR)  
                 
-                # Now concatenate them since they all have 3 channels!
+                # Now we concatenate them since they all have 3 channels
                 # Create a blank image to fill empty grid slots
                 blank = np.zeros((hist_h, hist_w, 3), dtype=np.uint8)
                 #row1 = cv2.hconcat([frame, gray_rgb, hsv])
