@@ -33,9 +33,6 @@ else:
         cv2.createTrackbar("Canny Lower Threshold", "My Dashboard", 50, 255, nothing)
         cv2.createTrackbar("Canny Upper Threshold", "My Dashboard", 100, 255, nothing)
 
-        # Manual Sobel selector (0 -> 3x3, 1 -> 5x5)
-        cv2.createTrackbar("Manual Sobel", "My Dashboard", 0, 1, nothing)
-
         # FPS timer
         prev_time = time.time()
 
@@ -152,8 +149,7 @@ else:
                 laplacian_abs = cv2.convertScaleAbs(laplacian)
 
                 # Manual Sobel
-                man_choice = cv2.getTrackbarPos("Manual Sobel", "My Dashboard")
-                man_sobel_k = 3 if man_choice == 0 else 5
+                man_sobel_k = 3
 
                 if man_sobel_k == 3:
                         Kx = np.array([[-1, 0, 1],
@@ -162,13 +158,6 @@ else:
                         Ky = np.array([[-1, -2, -1],
                                        [ 0,  0,  0],
                                        [ 1,  2,  1]], dtype=np.float32)
-                else:
-                        Kx = np.array([[-1, -2, 0, 2, 1],
-                                       [-4, -8, 0, 8, 4],
-                                       [-6, -12, 0, 12, 6],
-                                       [-4, -8, 0, 8, 4],
-                                       [-1, -2, 0, 2, 1]], dtype=np.float32)
-                        Ky = Kx.T
 
                 man_gx = cv2.filter2D(gray, cv2.CV_64F, Kx)
                 man_gy = cv2.filter2D(gray, cv2.CV_64F, Ky)
